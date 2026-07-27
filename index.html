@@ -494,6 +494,7 @@
         function getMatches(str, sysChecked, customRules) {
             let matches = [];
             
+            // 1. System Rule matches
             if (sysChecked) {
                 const re = /[A0IT7]/g;
                 let m;
@@ -502,15 +503,49 @@
                 }
             }
 
+            // 2. Custom Rules matches
             for (let rule of customRules) {
                 const L = rule.seq.length;
-                if (L > str.length) continue;
+                if (L === 0 || L > str.length) continue;
 
                 if (rule.permute) {
-                    const sortedSeq = rule.seq.split('').sort().join('');
+                    // Pre-calculate requirements for permutations
+                    let wildcards = 0;
+                    let needed = [];
+                    for (let char of rule.seq) {
+                        if (char === '*') wildcards++;
+                        else needed.push(char);
+                    }
+
+                    // Sliding window for permutation with wildcards
                     for (let i = 0; i <= str.length - L; i++) {
                         const sub = str.substr(i, L);
-                        if (sub.split('').sort().join('') === sortedSeq) {
+                        
+                        let subChars = sub.split('');
+                        let isMatch = true;
+                        
+                        // Try to consume necessary characters
+                        for (let char of needed) {
+                            let idx = subChars.indexOf(char);
+                            if (idx !== -1) {
+                                subChars.splice(idx, 1); // Consume the found character
+                            } else {
+                                isMatch = false; // Missing a required non-wildcard character
+                                break;
+                            }
+                        }
+                        
+                        // If we found all needed chars, remaining chars must equal number of wildcards
+                        if (isMatch && subChars.length === wildcards) {
+                            // Verify if it happens to be an exact match (respecting wildcards) in its current order
+                            let isExact = true;
+                            for (let k = 0; k < L; k++) {
+                                if (rule.seq[k] !== '*' && rule.seq[k] !== sub[k]) {
+                                    isExact = false; 
+                                    break;
+                                }
+                            }
+
                             matches.push({ 
                                 start: i, 
                                 end: i + L, 
@@ -520,25 +555,36 @@
                                 color: rule.color, 
                                 label: rule.label,
                                 isPermuteMatch: true,
-                                isExact: (sub === rule.seq)
+                                isExact: isExact
                             });
                         }
                     }
                 } else {
-                    let idx = 0;
-                    while ((idx = str.indexOf(rule.seq, idx)) !== -1) {
-                        matches.push({ 
-                            start: idx, 
-                            end: idx + L, 
-                            text: str.substr(idx, L), 
-                            type: 'custom', 
-                            rule: rule,
-                            color: rule.color, 
-                            label: rule.label,
-                            isPermuteMatch: false,
-                            isExact: true
-                        });
-                        idx += L;
+                    // Sliding window for exact match with wildcards
+                    for (let i = 0; i <= str.length - L; i++) {
+                        const sub = str.substr(i, L);
+                        let isExact = true;
+                        
+                        for (let k = 0; k < L; k++) {
+                            if (rule.seq[k] !== '*' && rule.seq[k] !== sub[k]) {
+                                isExact = false; 
+                                break;
+                            }
+                        }
+                        
+                        if (isExact) {
+                            matches.push({ 
+                                start: i, 
+                                end: i + L, 
+                                text: sub, 
+                                type: 'custom', 
+                                rule: rule,
+                                color: rule.color, 
+                                label: rule.label,
+                                isPermuteMatch: false,
+                                isExact: true
+                            });
+                        }
                     }
                 }
             }
@@ -576,6 +622,7 @@
                 }
             }
 
+            // Re-sort chronologically for proper DOM construction
             validMatches.sort((a, b) => a.start - b.start);
             return validMatches;
         }
