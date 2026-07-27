@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cipher Solver Workspace</title>
+    <style>
+        @font-face {
+            font-family: 'Cryptic';
+            src: url('canto.crypticseason2-monochrome.ttf') format('truetype');
+        }
+
+        :root {
+            --sidebar-width: 320px;
+            --bg-color: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #ffffff;
+        }
+
+        /* Sidebar Styles */
+        #sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-color);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-section h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 14px;
+            text-transform: uppercase;
+            color: #495057;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            margin-right: 8px;
+        }
+
+        /* Rule Items */
+        .rule-item {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .rule-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .rule-item input[type="text"] {
+            flex-grow: 1;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .rule-item input[type="color"] {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .rule-item .remove-btn {
+            background: #ffe3e3;
+            color: #c92a2a;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 6px 10px;
+            font-weight: bold;
+        }
+
+        .add-rule-btn {
+            width: 100%;
+            padding: 10px;
+            background: #e9ecef;
+            border: 1px dashed #adb5bd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            color: #495057;
+            transition: background 0.2s;
+        }
+        
+        .add-rule-btn:hover {
+            background: #dee2e6;
+        }
+
+        /* Main Area Styles */
+        #main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Toolbar */
+        #toolbar {
+            padding: 12px 20px;
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .tool-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.1s;
+        }
+
+        .tool-btn:hover { background: #f1f3f5; }
+
+        /* Content Area */
+        #content {
+            flex-grow: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #ffffff;
+        }
+
+        .cipher-section {
+            margin-bottom: 40px;
+            max-width: 800px;
+        }
+
+        .cipher-header {
+            margin-bottom: 15px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cipher-content {
+            font-family: 'Cryptic', monospace;
+            font-size: 60px;
+            line-height: 1.8; /* Large line height for ruby text */
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: #fdfdfd;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            outline: none;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+            transition: border-color 0.2s;
+        }
+
+        .cipher-content:focus {
+            border-color: #339af0;
+        }
+
+        /* Highlight & Ruby Styles */
+        mark.sys-hl {
+            background: transparent;
+            color: #e93d82;
+            /* font-weight: bold; */
+        }
+
+        mark.auto-hl {
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        ruby {
+            ruby-position: under;
+            ruby-align: center;
+        }
+
+        rt {
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: normal;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <!-- Component 1: System Highlights -->
+        <div class="sidebar-section">
+            <h4>System Highlight</h4>
+            <label class="checkbox-label">
+                <input type="checkbox" id="sys-toggle" checked onchange="updateAllCiphers()">
+                Highlight A 0 I T 7
+            </label>
+        </div>
+
+        <!-- Component 2: Categories -->
+        <div class="sidebar-section">
+            <h4>Categories</h4>
+            <div id="category-filters">
+                <!-- Filters injected by JS -->
+            </div>
+        </div>
+
+        <!-- Component 3: Custom Sequences -->
+        <div class="sidebar-section">
+            <h4>Sequence Finders</h4>
+            <div id="rules-container">
+                <!-- Rules injected by JS -->
+            </div>
+            <button class="add-rule-btn" onclick="addRule()">+</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main">
+        <!-- Toolbar -->
+        <div id="toolbar">
+            <span style="font-size: 14px; color: #666; margin-right: 10px;">Text Color:</span>
+            <button class="tool-btn" style="color: #e03131; border-color: #e03131;" onmousedown="event.preventDefault(); document.execCommand('foreColor', false, '#e03131')">Red</button>
+            <button class="tool-btn" style="color: #2f9e44; border-color: #2f9e44;" onmousedown="event.preventDefault(); document.execCommand('foreColor', false, '#2f9e44')">Green</button>
+            <button class="tool-btn" style="color: #1971c2; border-color: #1971c2;" onmousedown="event.preventDefault(); document.execCommand('foreColor', false, '#1971c2')">Blue</button>
+            <button class="tool-btn" style="color: #f08c00; border-color: #f08c00;" onmousedown="event.preventDefault(); document.execCommand('foreColor', false, '#f08c00')">Orange</button>
+            <button class="tool-btn" style="color: #6741d9; border-color: #6741d9;" onmousedown="event.preventDefault(); document.execCommand('foreColor', false, '#6741d9')">Purple</button>
+            <button class="tool-btn" onmousedown="event.preventDefault(); document.execCommand('removeFormat', false, null)" style="margin-left: auto;">Clear Format</button>
+        </div>
+
+        <!-- Ciphers -->
+        <div id="content">
+            <p style="color: #666;">Loading ciphers...</p>
+        </div>
+    </div>
+
+    <script>
+        // Update this back to TSV_URL if you want to pull directly from Google Sheets
+        const TSV_URL = "./canto.cryptic season 2 text - Sheet1.tsv"; 
+        
+        // Initial setup for the 3 default rules
+        const defaultColors = ['#ffd43b', '#69db7c', '#4dabf7'];
+        let rulesInitialized = 0;
+
+        // Utility: Calculate contrast color (black/white) for ruby background
+        function getContrastYIQ(hexcolor){
+            hexcolor = hexcolor.replace("#", "");
+            if(hexcolor.length === 3) hexcolor = hexcolor.split('').map(c => c+c).join('');
+            const r = parseInt(hexcolor.substr(0,2),16);
+            const g = parseInt(hexcolor.substr(2,2),16);
+            const b = parseInt(hexcolor.substr(4,2),16);
+            const yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#000000' : '#ffffff';
+        }
+
+        // Utility: Debounce for inputs
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        // Add Rule UI
+        function addRule() {
+            const container = document.getElementById('rules-container');
+            const ruleDiv = document.createElement('div');
+            ruleDiv.className = 'rule-item';
+
+            const color = defaultColors[rulesInitialized % defaultColors.length] || '#e9ecef';
+            rulesInitialized++;
+
+            ruleDiv.innerHTML = `
+                <div class="rule-row">
+                    <input type="text" class="rule-seq" placeholder="Sequence (e.g., 1J40)">
+                    <label class="checkbox-label" style="margin: 0;">
+                        <input type="checkbox" class="rule-permute"> Permute
+                    </label>
+                </div>
+                <div class="rule-row">
+                    <input type="color" class="rule-color" value="${color}">
+                    <input type="text" class="rule-label" placeholder="Label">
+                    <button class="remove-btn" onclick="this.closest('.rule-item').remove(); updateAllCiphers();">X</button>
+                </div>
+            `;
+
+            // Attach debounced event listeners
+            const debouncedUpdate = debounce(updateAllCiphers, 400);
+            ruleDiv.querySelectorAll('input[type="text"], input[type="color"]').forEach(el => el.addEventListener('input', debouncedUpdate));
+            ruleDiv.querySelectorAll('input[type="checkbox"]').forEach(el => el.addEventListener('change', updateAllCiphers));
+
+            container.appendChild(ruleDiv);
+        }
+
+        // Gather active rules
+        function getCustomRules() {
+            const rules = [];
+            document.querySelectorAll('.rule-item').forEach(div => {
+                const seq = div.querySelector('.rule-seq').value.trim();
+                if (seq) {
+                    rules.push({
+                        seq: seq,
+                        permute: div.querySelector('.rule-permute').checked,
+                        color: div.querySelector('.rule-color').value,
+                        label: div.querySelector('.rule-label').value.trim()
+                    });
+                }
+            });
+            return rules;
+        }
+
+        // Find matches in a string based on rules
+        function getMatches(str, sysChecked, customRules) {
+            let matches = [];
+            
+            // System Rule matches
+            if (sysChecked) {
+                const re = /[A0IT7]/g;
+                let m;
+                while ((m = re.exec(str)) !== null) {
+                    matches.push({ start: m.index, end: m.index + 1, text: m[0], type: 'sys' });
+                }
+            }
+
+            // Custom Rules matches
+            for (let rule of customRules) {
+                const L = rule.seq.length;
+                if (L > str.length) continue;
+
+                if (rule.permute) {
+                    const sortedSeq = rule.seq.split('').sort().join('');
+                    for (let i = 0; i <= str.length - L; i++) {
+                        const sub = str.substr(i, L);
+                        if (sub.split('').sort().join('') === sortedSeq) {
+                            const isExact = (sub === rule.seq);
+                            matches.push({ 
+                                start: i, 
+                                end: i + L, 
+                                text: sub, 
+                                type: 'custom', 
+                                color: rule.color, 
+                                label: rule.label,
+                                isPermuteMatch: true,
+                                isExact: isExact
+                            });
+                        }
+                    }
+                } else {
+                    let idx = 0;
+                    while ((idx = str.indexOf(rule.seq, idx)) !== -1) {
+                        matches.push({ 
+                            start: idx, 
+                            end: idx + L, 
+                            text: str.substr(idx, L), 
+                            type: 'custom', 
+                            color: rule.color, 
+                            label: rule.label,
+                            isPermuteMatch: false 
+                        });
+                        idx += L;
+                    }
+                }
+            }
+
+            // Sort matches: longest first (priority), then earliest index, then custom over sys
+            matches.sort((a, b) => {
+                if (a.start !== b.start) return a.start - b.start;
+                const lenA = a.end - a.start;
+                const lenB = b.end - b.start;
+                if (lenA !== lenB) return lenB - lenA; 
+                if (a.type !== b.type) return a.type === 'custom' ? -1 : 1;
+                return 0;
+            });
+
+            // Filter out overlaps
+            const validMatches = [];
+            let lastEnd = 0;
+            for (let m of matches) {
+                if (m.start >= lastEnd) {
+                    validMatches.push(m);
+                    lastEnd = m.end;
+                }
+            }
+            return validMatches;
+        }
+
+        // Build DOM fragment with matched highlights
+        function buildHighlightedFragment(str, matches) {
+            const fragment = document.createDocumentFragment();
+            let lastIndex = 0;
+
+            for (let match of matches) {
+                if (match.start > lastIndex) {
+                    fragment.appendChild(document.createTextNode(str.slice(lastIndex, match.start)));
+                }
+
+                const mark = document.createElement('mark');
+                mark.setAttribute('data-raw', match.text); // Preserve raw text for unwrapping
+                
+                if (match.type === 'sys') {
+                    mark.className = 'sys-hl';
+                    mark.textContent = match.text;
+                } else {
+                    mark.className = 'auto-hl';
+                    mark.style.backgroundColor = match.color;
+                    mark.style.color = getContrastYIQ(match.color);
+                    
+                    // Permutation border logic
+                    if (match.isPermuteMatch) {
+                        mark.style.boxSizing = 'border-box';
+                        if (match.isExact) {
+                            mark.style.border = '2px solid #2f9e44'; // Green for exact
+                        } else {
+                            mark.style.border = '2px solid #e03131'; // Red for inexact
+                        }
+                    }
+                    
+                    const ruby = document.createElement('ruby');
+                    ruby.textContent = match.text;
+                    
+                    if (match.label) {
+                        const rt = document.createElement('rt');
+                        rt.textContent = match.label;
+                        ruby.appendChild(rt);
+                    }
+                    
+                    mark.appendChild(ruby);
+                }
+                
+                fragment.appendChild(mark);
+                lastIndex = match.end;
+            }
+
+            if (lastIndex < str.length) {
+                fragment.appendChild(document.createTextNode(str.slice(lastIndex)));
+            }
+            return fragment;
+        }
+
+        // Apply highlights across all text nodes inside ciphers
+        function updateAllCiphers() {
+            const sysChecked = document.getElementById('sys-toggle').checked;
+            const customRules = getCustomRules();
+
+            document.querySelectorAll('.cipher-content').forEach(el => {
+                // 1. Unwrap old auto-highlights safely to restore raw text nodes
+                const marks = el.querySelectorAll('mark.sys-hl, mark.auto-hl');
+                marks.forEach(m => {
+                    const rawText = m.getAttribute('data-raw') || m.textContent;
+                    const textNode = document.createTextNode(rawText);
+                    m.parentNode.replaceChild(textNode, m);
+                });
+                
+                // Merge adjacent text nodes created by unwrapping
+                el.normalize();
+
+                // 2. Traverse text nodes and apply new highlights
+                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+                const textNodes = [];
+                while (walker.nextNode()) {
+                    if (walker.currentNode.nodeValue.trim() !== '') {
+                        textNodes.push(walker.currentNode);
+                    }
+                }
+
+                textNodes.forEach(node => {
+                    const str = node.nodeValue;
+                    const matches = getMatches(str, sysChecked, customRules);
+                    if (matches.length > 0) {
+                        const frag = buildHighlightedFragment(str, matches);
+                        node.parentNode.replaceChild(frag, node);
+                    }
+                });
+            });
+        }
+
+        // Color generator for category badges
+        const palette = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
+        const catColors = {};
+        function getCategoryColor(cat) {
+            if (!catColors[cat]) {
+                catColors[cat] = palette[Object.keys(catColors).length % palette.length];
+            }
+            return catColors[cat];
+        }
+
+        // Category Filter Logic
+        function renderCategoryFilters(categories) {
+            const container = document.getElementById('category-filters');
+            container.innerHTML = '';
+            categories.forEach(cat => {
+                const label = document.createElement('label');
+                label.className = 'checkbox-label';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = true;
+                cb.value = cat;
+                cb.onchange = updateCategoryVisibility;
+                
+                const colorDot = document.createElement('span');
+                colorDot.style.cssText = `display:inline-block; width:12px; height:12px; border-radius:50%; background-color:${getCategoryColor(cat)}; margin: 0 6px 0 2px;`;
+                
+                label.appendChild(cb);
+                label.appendChild(colorDot);
+                label.appendChild(document.createTextNode(cat));
+                container.appendChild(label);
+            });
+        }
+
+        function updateCategoryVisibility() {
+            const checkedBoxes = Array.from(document.querySelectorAll('#category-filters input:checked')).map(cb => cb.value);
+            document.querySelectorAll('.cipher-section').forEach(sec => {
+                sec.style.display = checkedBoxes.includes(sec.dataset.category) ? '' : 'none';
+            });
+        }
+
+        // Load & Parse Data
+        async function loadData() {
+            try {
+                const response = await fetch(TSV_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                const tsv = await response.text();
+                
+                const lines = tsv.split(/\r?\n/);
+                const data = [];
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const cols = lines[i].split('\t');
+                    data.push({
+                        day: cols[0],
+                        title: cols[1],
+                        category: cols[2],
+                        checked: cols[3],
+                        content: cols[4] ? cols[4].replace(/\\n/g, '\n') : ''
+                    });
+                }
+
+                // Render Content
+                const contentContainer = document.getElementById('content');
+                contentContainer.innerHTML = '';
+                
+                const categories = [...new Set(data.map(d => d.category))].filter(c => c);
+                renderCategoryFilters(categories);
+
+                data.forEach(row => {
+                    if (!row.day) return;
+                    
+                    const section = document.createElement('div');
+                    section.className = 'cipher-section';
+                    section.dataset.category = row.category;
+
+                    const header = document.createElement('div');
+                    header.className = 'cipher-header';
+                    
+                    // Title
+                    const titleNode = document.createElement('strong');
+                    titleNode.textContent = `Day ${row.day}: ${row.title}`;
+                    header.appendChild(titleNode);
+                    
+                    // Category Badge
+                    const catBadge = document.createElement('span');
+                    catBadge.className = 'badge';
+                    catBadge.textContent = row.category;
+                    catBadge.style.backgroundColor = getCategoryColor(row.category);
+                    header.appendChild(catBadge);
+
+                    // Checked Status Badge
+                    const isChecked = String(row.checked).trim().toUpperCase() === 'TRUE';
+                    const checkBadge = document.createElement('span');
+                    checkBadge.className = 'badge';
+                    checkBadge.textContent = isChecked ? 'CHECKED' : 'NOT CHECKED';
+                    checkBadge.style.backgroundColor = isChecked ? '#2b8a3e' : '#e03131'; // Green / Red
+                    header.appendChild(checkBadge);
+
+                    // Content
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'cipher-content';
+                    contentDiv.contentEditable = "true";
+                    contentDiv.spellcheck = false;
+                    contentDiv.textContent = row.content;
+
+                    section.appendChild(header);
+                    section.appendChild(contentDiv);
+                    contentContainer.appendChild(section);
+                });
+
+                // Apply initial highlights
+                updateAllCiphers();
+
+            } catch (error) {
+                document.getElementById('content').innerHTML = `<p style="color:red">Failed to load data: ${error.message}</p>`;
+            }
+        }
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            // Setup initial 3 rules
+            for(let i = 0; i < 3; i++) addRule();
+            loadData();
+        });
+
+    </script>
+</body>
+</html>
