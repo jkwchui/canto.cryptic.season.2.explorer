@@ -11,7 +11,7 @@
         }
 
         :root {
-            --sidebar-width: 320px;
+            --sidebar-width: 340px;
             --bg-color: #f8f9fa;
             --border-color: #dee2e6;
         }
@@ -107,6 +107,52 @@
             font-weight: bold;
         }
 
+        /* Accordion Styles */
+        .accordion-btn {
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            margin-top: 4px;
+            color: #495057;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .accordion-btn:hover { background: #e9ecef; }
+
+        .accordion-content {
+            display: none;
+            margin-top: 4px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .accordion-content.open {
+            display: block;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .stats-table th, .stats-table td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 6px 4px;
+        }
+
+        .stats-table th { background: #f1f3f5; color: #495057; font-weight: 600; }
+        .stats-table tr:last-child td { border-bottom: none; }
+
         .add-rule-btn {
             width: 100%;
             padding: 10px;
@@ -188,7 +234,7 @@
         .cipher-content {
             font-family: 'Cryptic', monospace;
             font-size: 60px;
-            line-height: 1.8; /* Large line height for ruby text */
+            line-height: 1.8; 
             padding: 20px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
@@ -208,7 +254,7 @@
         mark.sys-hl {
             background: transparent;
             color: #e93d82;
-            /* font-weight: bold; */
+            /* Font weight bold removed to fix glyph rendering issues */
         }
 
         mark.auto-hl {
@@ -282,14 +328,12 @@
     </div>
 
     <script>
-        // Update this back to TSV_URL if you want to pull directly from Google Sheets
         const TSV_URL = "./canto.cryptic season 2 text - Sheet1.tsv"; 
         
         // Initial setup for the 3 default rules
         const defaultColors = ['#ffd43b', '#69db7c', '#4dabf7'];
         let rulesInitialized = 0;
 
-        // Utility: Calculate contrast color (black/white) for ruby background
         function getContrastYIQ(hexcolor){
             hexcolor = hexcolor.replace("#", "");
             if(hexcolor.length === 3) hexcolor = hexcolor.split('').map(c => c+c).join('');
@@ -300,7 +344,6 @@
             return (yiq >= 128) ? '#000000' : '#ffffff';
         }
 
-        // Utility: Debounce for inputs
         function debounce(func, wait) {
             let timeout;
             return function(...args) {
@@ -309,7 +352,12 @@
             };
         }
 
-        // Add Rule UI
+        function toggleAccordion(btn) {
+            const content = btn.nextElementSibling;
+            content.classList.toggle('open');
+            btn.textContent = content.classList.contains('open') ? '▼ Statistics' : '▶ Statistics';
+        }
+
         function addRule() {
             const container = document.getElementById('rules-container');
             const ruleDiv = document.createElement('div');
@@ -330,9 +378,10 @@
                     <input type="text" class="rule-label" placeholder="Label">
                     <button class="remove-btn" onclick="this.closest('.rule-item').remove(); updateAllCiphers();">X</button>
                 </div>
+                <button class="accordion-btn" onclick="toggleAccordion(this)">▶ Statistics</button>
+                <div class="accordion-content stats-container"></div>
             `;
 
-            // Attach debounced event listeners
             const debouncedUpdate = debounce(updateAllCiphers, 400);
             ruleDiv.querySelectorAll('input[type="text"], input[type="color"]').forEach(el => el.addEventListener('input', debouncedUpdate));
             ruleDiv.querySelectorAll('input[type="checkbox"]').forEach(el => el.addEventListener('change', updateAllCiphers));
@@ -340,28 +389,28 @@
             container.appendChild(ruleDiv);
         }
 
-        // Gather active rules
         function getCustomRules() {
             const rules = [];
             document.querySelectorAll('.rule-item').forEach(div => {
                 const seq = div.querySelector('.rule-seq').value.trim();
                 if (seq) {
                     rules.push({
+                        element: div,
                         seq: seq,
                         permute: div.querySelector('.rule-permute').checked,
                         color: div.querySelector('.rule-color').value,
                         label: div.querySelector('.rule-label').value.trim()
                     });
+                } else {
+                    div.querySelector('.stats-container').innerHTML = ''; // Clear stats if empty
                 }
             });
             return rules;
         }
 
-        // Find matches in a string based on rules
         function getMatches(str, sysChecked, customRules) {
             let matches = [];
             
-            // System Rule matches
             if (sysChecked) {
                 const re = /[A0IT7]/g;
                 let m;
@@ -370,7 +419,6 @@
                 }
             }
 
-            // Custom Rules matches
             for (let rule of customRules) {
                 const L = rule.seq.length;
                 if (L > str.length) continue;
@@ -380,16 +428,16 @@
                     for (let i = 0; i <= str.length - L; i++) {
                         const sub = str.substr(i, L);
                         if (sub.split('').sort().join('') === sortedSeq) {
-                            const isExact = (sub === rule.seq);
                             matches.push({ 
                                 start: i, 
                                 end: i + L, 
                                 text: sub, 
                                 type: 'custom', 
+                                rule: rule,
                                 color: rule.color, 
                                 label: rule.label,
                                 isPermuteMatch: true,
-                                isExact: isExact
+                                isExact: (sub === rule.seq)
                             });
                         }
                     }
@@ -401,16 +449,17 @@
                             end: idx + L, 
                             text: str.substr(idx, L), 
                             type: 'custom', 
+                            rule: rule,
                             color: rule.color, 
                             label: rule.label,
-                            isPermuteMatch: false 
+                            isPermuteMatch: false,
+                            isExact: true
                         });
                         idx += L;
                     }
                 }
             }
 
-            // Sort matches: longest first (priority), then earliest index, then custom over sys
             matches.sort((a, b) => {
                 if (a.start !== b.start) return a.start - b.start;
                 const lenA = a.end - a.start;
@@ -420,7 +469,6 @@
                 return 0;
             });
 
-            // Filter out overlaps
             const validMatches = [];
             let lastEnd = 0;
             for (let m of matches) {
@@ -432,7 +480,6 @@
             return validMatches;
         }
 
-        // Build DOM fragment with matched highlights
         function buildHighlightedFragment(str, matches) {
             const fragment = document.createDocumentFragment();
             let lastIndex = 0;
@@ -443,7 +490,7 @@
                 }
 
                 const mark = document.createElement('mark');
-                mark.setAttribute('data-raw', match.text); // Preserve raw text for unwrapping
+                mark.setAttribute('data-raw', match.text);
                 
                 if (match.type === 'sys') {
                     mark.className = 'sys-hl';
@@ -453,14 +500,9 @@
                     mark.style.backgroundColor = match.color;
                     mark.style.color = getContrastYIQ(match.color);
                     
-                    // Permutation border logic
                     if (match.isPermuteMatch) {
                         mark.style.boxSizing = 'border-box';
-                        if (match.isExact) {
-                            mark.style.border = '2px solid #2f9e44'; // Green for exact
-                        } else {
-                            mark.style.border = '2px solid #e03131'; // Red for inexact
-                        }
+                        mark.style.border = match.isExact ? '2px solid #2f9e44' : '2px solid #e03131';
                     }
                     
                     const ruby = document.createElement('ruby');
@@ -485,25 +527,29 @@
             return fragment;
         }
 
-        // Apply highlights across all text nodes inside ciphers
         function updateAllCiphers() {
             const sysChecked = document.getElementById('sys-toggle').checked;
             const customRules = getCustomRules();
 
-            document.querySelectorAll('.cipher-content').forEach(el => {
-                // 1. Unwrap old auto-highlights safely to restore raw text nodes
-                const marks = el.querySelectorAll('mark.sys-hl, mark.auto-hl');
+            // Initialize statistics map for active custom rules
+            const ruleStats = new Map();
+            customRules.forEach(r => ruleStats.set(r, {})); // Keyed by day
+
+            document.querySelectorAll('.cipher-section').forEach(sec => {
+                const day = sec.dataset.day;
+                const category = sec.dataset.category;
+                const contentEl = sec.querySelector('.cipher-content');
+
+                const marks = contentEl.querySelectorAll('mark.sys-hl, mark.auto-hl');
                 marks.forEach(m => {
                     const rawText = m.getAttribute('data-raw') || m.textContent;
                     const textNode = document.createTextNode(rawText);
                     m.parentNode.replaceChild(textNode, m);
                 });
                 
-                // Merge adjacent text nodes created by unwrapping
-                el.normalize();
+                contentEl.normalize();
 
-                // 2. Traverse text nodes and apply new highlights
-                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+                const walker = document.createTreeWalker(contentEl, NodeFilter.SHOW_TEXT, null, false);
                 const textNodes = [];
                 while (walker.nextNode()) {
                     if (walker.currentNode.nodeValue.trim() !== '') {
@@ -514,15 +560,66 @@
                 textNodes.forEach(node => {
                     const str = node.nodeValue;
                     const matches = getMatches(str, sysChecked, customRules);
+                    
                     if (matches.length > 0) {
+                        // Tally stats for valid matches only
+                        matches.forEach(m => {
+                            if (m.type === 'custom') {
+                                const rStats = ruleStats.get(m.rule);
+                                if (!rStats[day]) {
+                                    rStats[day] = { day, category, exact: 0, inexact: 0 };
+                                }
+                                if (m.isExact) rStats[day].exact++;
+                                else rStats[day].inexact++;
+                            }
+                        });
+
                         const frag = buildHighlightedFragment(str, matches);
                         node.parentNode.replaceChild(frag, node);
                     }
                 });
             });
+
+            // Render stats tables
+            customRules.forEach(rule => {
+                const container = rule.element.querySelector('.stats-container');
+                const statsData = Object.values(ruleStats.get(rule));
+                
+                if (statsData.length === 0) {
+                    container.innerHTML = '<div style="padding: 10px; color: #868e96; text-align: center; font-size: 12px;">No matches found</div>';
+                    return;
+                }
+
+                // Sort numerically by day
+                statsData.sort((a, b) => String(a.day).localeCompare(String(b.day), undefined, { numeric: true }));
+
+                let tableHTML = `
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Category</th>
+                                <th>Exact</th>
+                                <th>Inexact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                statsData.forEach(row => {
+                    tableHTML += `
+                        <tr>
+                            <td>${row.day}</td>
+                            <td>${row.category}</td>
+                            <td>${row.exact}</td>
+                            <td>${row.inexact}</td>
+                        </tr>
+                    `;
+                });
+                tableHTML += `</tbody></table>`;
+                container.innerHTML = tableHTML;
+            });
         }
 
-        // Color generator for category badges
         const palette = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
         const catColors = {};
         function getCategoryColor(cat) {
@@ -532,7 +629,6 @@
             return catColors[cat];
         }
 
-        // Category Filter Logic
         function renderCategoryFilters(categories) {
             const container = document.getElementById('category-filters');
             container.innerHTML = '';
@@ -563,7 +659,6 @@
             });
         }
 
-        // Load & Parse Data
         async function loadData() {
             try {
                 const response = await fetch(TSV_URL);
@@ -584,7 +679,6 @@
                     });
                 }
 
-                // Render Content
                 const contentContainer = document.getElementById('content');
                 contentContainer.innerHTML = '';
                 
@@ -597,31 +691,28 @@
                     const section = document.createElement('div');
                     section.className = 'cipher-section';
                     section.dataset.category = row.category;
+                    section.dataset.day = row.day; // Added for stats tracking
 
                     const header = document.createElement('div');
                     header.className = 'cipher-header';
                     
-                    // Title
                     const titleNode = document.createElement('strong');
                     titleNode.textContent = `Day ${row.day}: ${row.title}`;
                     header.appendChild(titleNode);
                     
-                    // Category Badge
                     const catBadge = document.createElement('span');
                     catBadge.className = 'badge';
                     catBadge.textContent = row.category;
                     catBadge.style.backgroundColor = getCategoryColor(row.category);
                     header.appendChild(catBadge);
 
-                    // Checked Status Badge
                     const isChecked = String(row.checked).trim().toUpperCase() === 'TRUE';
                     const checkBadge = document.createElement('span');
                     checkBadge.className = 'badge';
                     checkBadge.textContent = isChecked ? 'CHECKED' : 'NOT CHECKED';
-                    checkBadge.style.backgroundColor = isChecked ? '#2b8a3e' : '#e03131'; // Green / Red
+                    checkBadge.style.backgroundColor = isChecked ? '#2b8a3e' : '#e03131';
                     header.appendChild(checkBadge);
 
-                    // Content
                     const contentDiv = document.createElement('div');
                     contentDiv.className = 'cipher-content';
                     contentDiv.contentEditable = "true";
@@ -633,7 +724,6 @@
                     contentContainer.appendChild(section);
                 });
 
-                // Apply initial highlights
                 updateAllCiphers();
 
             } catch (error) {
@@ -641,9 +731,7 @@
             }
         }
 
-        // Initialize App
         window.addEventListener('DOMContentLoaded', () => {
-            // Setup initial 3 rules
             for(let i = 0; i < 3; i++) addRule();
             loadData();
         });
