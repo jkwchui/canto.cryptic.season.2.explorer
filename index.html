@@ -415,7 +415,8 @@
                 const re = /[A0IT7]/g;
                 let m;
                 while ((m = re.exec(str)) !== null) {
-                    matches.push({ start: m.index, end: m.index + 1, text: m[0], type: 'sys' });
+                    // Added isExact: true so sys highlights don't get deprioritized
+                    matches.push({ start: m.index, end: m.index + 1, text: m[0], type: 'sys', isExact: true });
                 }
             }
 
@@ -460,23 +461,49 @@
                 }
             }
 
+            // NEW SORTING LOGIC: Prioritize by importance, not just starting position
             matches.sort((a, b) => {
-                if (a.start !== b.start) return a.start - b.start;
+                // 1. Longest matches first
                 const lenA = a.end - a.start;
                 const lenB = b.end - b.start;
                 if (lenA !== lenB) return lenB - lenA; 
+                
+                // 2. Exact matches over inexact (permutations)
+                if (a.isExact !== b.isExact) return a.isExact ? -1 : 1;
+                
+                // 3. Custom rules over system rules
                 if (a.type !== b.type) return a.type === 'custom' ? -1 : 1;
-                return 0;
+                
+                // 4. If all else is equal, earlier index wins
+                return a.start - b.start;
             });
 
+            // NEW FILTER LOGIC: Use an array to track occupied character positions
             const validMatches = [];
-            let lastEnd = 0;
+            const used = new Array(str.length).fill(false);
+
             for (let m of matches) {
-                if (m.start >= lastEnd) {
+                // Check if any character in this match's range is already used by a higher-priority match
+                let isOverlap = false;
+                for (let i = m.start; i < m.end; i++) {
+                    if (used[i]) {
+                        isOverlap = true;
+                        break;
+                    }
+                }
+                
+                // If the space is free, claim it
+                if (!isOverlap) {
                     validMatches.push(m);
-                    lastEnd = m.end;
+                    for (let i = m.start; i < m.end; i++) {
+                        used[i] = true;
+                    }
                 }
             }
+
+            // Re-sort the final valid matches sequentially by start index so DOM replacement builds correctly
+            validMatches.sort((a, b) => a.start - b.start);
+            
             return validMatches;
         }
 
