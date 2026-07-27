@@ -107,7 +107,7 @@
             font-weight: bold;
         }
 
-        /* Accordion Styles */
+        /* Accordion & Stats Styles */
         .accordion-btn {
             background: #f8f9fa;
             border: 1px solid var(--border-color);
@@ -141,17 +141,28 @@
         .stats-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 11px;
+            font-size: 12px; /* Matched slightly larger font for readability */
             text-align: center;
         }
 
         .stats-table th, .stats-table td {
             border-bottom: 1px solid var(--border-color);
-            padding: 6px 4px;
+            padding: 8px 6px;
         }
 
         .stats-table th { background: #f1f3f5; color: #495057; font-weight: 600; }
         .stats-table tr:last-child td { border-bottom: none; }
+
+        .stats-link {
+            color: #1971c2;
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .stats-link:hover {
+            color: #0b508a;
+        }
 
         .add-rule-btn {
             width: 100%;
@@ -175,6 +186,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
 
         /* Toolbar */
@@ -200,17 +212,41 @@
 
         .tool-btn:hover { background: #f1f3f5; }
 
+        /* Floating Back Button */
+        #go-back-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: #343a40;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        #go-back-btn:hover {
+            background: #212529;
+        }
+
         /* Content Area */
         #content {
             flex-grow: 1;
             padding: 30px;
             overflow-y: auto;
             background: #ffffff;
+            scroll-behavior: smooth; /* Ensure programmatic scrolling is smooth */
         }
 
         .cipher-section {
             margin-bottom: 40px;
-            max-width: 100%;
+            max-width: 100%; /* Utilize full width */
         }
 
         .cipher-header {
@@ -254,12 +290,22 @@
         mark.sys-hl {
             background: transparent;
             color: #e93d82;
-            /* Font weight bold removed to fix glyph rendering issues */
         }
 
         mark.auto-hl {
             padding: 2px 4px;
             border-radius: 4px;
+            transition: box-shadow 0.3s;
+        }
+
+        /* Jump Animation */
+        .flash-target {
+            animation: flashPulse 2s ease-out;
+        }
+
+        @keyframes flashPulse {
+            0% { box-shadow: 0 0 0 6px #ffd43b; }
+            100% { box-shadow: 0 0 0 0 transparent; }
         }
 
         ruby {
@@ -321,6 +367,9 @@
             <button class="tool-btn" onmousedown="event.preventDefault(); document.execCommand('removeFormat', false, null)" style="margin-left: auto;">Clear Format</button>
         </div>
 
+        <!-- Floating Back Button -->
+        <button id="go-back-btn" onclick="goBackToPrevious()">← Go Back to Previous Position</button>
+
         <!-- Ciphers -->
         <div id="content">
             <p style="color: #666;">Loading ciphers...</p>
@@ -328,11 +377,11 @@
     </div>
 
     <script>
-        const TSV_URL = "./canto.cryptic season 2 text - Sheet1.tsv"; 
+        const TSV_URL = "./data.tsv"; 
         
-        // Initial setup for the 3 default rules
         const defaultColors = ['#ffd43b', '#69db7c', '#4dabf7'];
         let rulesInitialized = 0;
+        let previousScrollTop = 0; // State for navigation
 
         function getContrastYIQ(hexcolor){
             hexcolor = hexcolor.replace("#", "");
@@ -358,10 +407,43 @@
             btn.textContent = content.classList.contains('open') ? '▼ Statistics' : '▶ Statistics';
         }
 
+        // Navigation Logic
+        function jumpToMatch(ruleId, day, type) {
+            const section = document.querySelector(`.cipher-section[data-day="${day}"]`);
+            if (!section) return;
+
+            // Find the specific exact or inexact mark for this rule within the specific day's section
+            const matchElement = section.querySelector(`mark[data-rule-id="${ruleId}"][data-match-type="${type}"]`);
+            if (matchElement) {
+                // Save current position and show button
+                const contentContainer = document.getElementById('content');
+                previousScrollTop = contentContainer.scrollTop;
+                document.getElementById('go-back-btn').style.display = 'block';
+
+                // Scroll smoothly to target element
+                matchElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add highlight flash
+                matchElement.classList.add('flash-target');
+                setTimeout(() => {
+                    matchElement.classList.remove('flash-target');
+                }, 2000);
+            }
+        }
+
+        function goBackToPrevious() {
+            const contentContainer = document.getElementById('content');
+            contentContainer.scrollTo({ top: previousScrollTop, behavior: 'smooth' });
+            document.getElementById('go-back-btn').style.display = 'none';
+        }
+
         function addRule() {
             const container = document.getElementById('rules-container');
             const ruleDiv = document.createElement('div');
             ruleDiv.className = 'rule-item';
+            
+            // Assign a unique ID to this rule for linking
+            ruleDiv.dataset.ruleId = 'rule-' + Date.now() + '-' + rulesInitialized;
 
             const color = defaultColors[rulesInitialized % defaultColors.length] || '#e9ecef';
             rulesInitialized++;
@@ -395,6 +477,7 @@
                 const seq = div.querySelector('.rule-seq').value.trim();
                 if (seq) {
                     rules.push({
+                        id: div.dataset.ruleId,
                         element: div,
                         seq: seq,
                         permute: div.querySelector('.rule-permute').checked,
@@ -415,7 +498,6 @@
                 const re = /[A0IT7]/g;
                 let m;
                 while ((m = re.exec(str)) !== null) {
-                    // Added isExact: true so sys highlights don't get deprioritized
                     matches.push({ start: m.index, end: m.index + 1, text: m[0], type: 'sys', isExact: true });
                 }
             }
@@ -461,29 +543,23 @@
                 }
             }
 
-            // NEW SORTING LOGIC: Prioritize by importance, not just starting position
+            // Prioritize: Length > Exact > Custom > Index
             matches.sort((a, b) => {
-                // 1. Longest matches first
                 const lenA = a.end - a.start;
                 const lenB = b.end - b.start;
                 if (lenA !== lenB) return lenB - lenA; 
                 
-                // 2. Exact matches over inexact (permutations)
                 if (a.isExact !== b.isExact) return a.isExact ? -1 : 1;
-                
-                // 3. Custom rules over system rules
                 if (a.type !== b.type) return a.type === 'custom' ? -1 : 1;
                 
-                // 4. If all else is equal, earlier index wins
                 return a.start - b.start;
             });
 
-            // NEW FILTER LOGIC: Use an array to track occupied character positions
+            // Prevent overlaps based on priority
             const validMatches = [];
             const used = new Array(str.length).fill(false);
 
             for (let m of matches) {
-                // Check if any character in this match's range is already used by a higher-priority match
                 let isOverlap = false;
                 for (let i = m.start; i < m.end; i++) {
                     if (used[i]) {
@@ -492,7 +568,6 @@
                     }
                 }
                 
-                // If the space is free, claim it
                 if (!isOverlap) {
                     validMatches.push(m);
                     for (let i = m.start; i < m.end; i++) {
@@ -501,9 +576,7 @@
                 }
             }
 
-            // Re-sort the final valid matches sequentially by start index so DOM replacement builds correctly
             validMatches.sort((a, b) => a.start - b.start);
-            
             return validMatches;
         }
 
@@ -526,6 +599,10 @@
                     mark.className = 'auto-hl';
                     mark.style.backgroundColor = match.color;
                     mark.style.color = getContrastYIQ(match.color);
+                    
+                    // Add attributes for linking logic
+                    mark.dataset.ruleId = match.rule.id;
+                    mark.dataset.matchType = match.isExact ? 'exact' : 'inexact';
                     
                     if (match.isPermuteMatch) {
                         mark.style.boxSizing = 'border-box';
@@ -558,9 +635,8 @@
             const sysChecked = document.getElementById('sys-toggle').checked;
             const customRules = getCustomRules();
 
-            // Initialize statistics map for active custom rules
             const ruleStats = new Map();
-            customRules.forEach(r => ruleStats.set(r, {})); // Keyed by day
+            customRules.forEach(r => ruleStats.set(r, {})); 
 
             document.querySelectorAll('.cipher-section').forEach(sec => {
                 const day = sec.dataset.day;
@@ -589,7 +665,6 @@
                     const matches = getMatches(str, sysChecked, customRules);
                     
                     if (matches.length > 0) {
-                        // Tally stats for valid matches only
                         matches.forEach(m => {
                             if (m.type === 'custom') {
                                 const rStats = ruleStats.get(m.rule);
@@ -607,7 +682,7 @@
                 });
             });
 
-            // Render stats tables
+            // Render stats tables with links
             customRules.forEach(rule => {
                 const container = rule.element.querySelector('.stats-container');
                 const statsData = Object.values(ruleStats.get(rule));
@@ -617,7 +692,6 @@
                     return;
                 }
 
-                // Sort numerically by day
                 statsData.sort((a, b) => String(a.day).localeCompare(String(b.day), undefined, { numeric: true }));
 
                 let tableHTML = `
@@ -633,12 +707,19 @@
                         <tbody>
                 `;
                 statsData.forEach(row => {
+                    const exactHTML = row.exact > 0 
+                        ? `<span class="stats-link" onclick="jumpToMatch('${rule.id}', '${row.day}', 'exact')">${row.exact}</span>` 
+                        : '0';
+                    const inexactHTML = row.inexact > 0 
+                        ? `<span class="stats-link" onclick="jumpToMatch('${rule.id}', '${row.day}', 'inexact')">${row.inexact}</span>` 
+                        : '0';
+
                     tableHTML += `
                         <tr>
                             <td>${row.day}</td>
                             <td>${row.category}</td>
-                            <td>${row.exact}</td>
-                            <td>${row.inexact}</td>
+                            <td>${exactHTML}</td>
+                            <td>${inexactHTML}</td>
                         </tr>
                     `;
                 });
@@ -718,7 +799,7 @@
                     const section = document.createElement('div');
                     section.className = 'cipher-section';
                     section.dataset.category = row.category;
-                    section.dataset.day = row.day; // Added for stats tracking
+                    section.dataset.day = row.day; 
 
                     const header = document.createElement('div');
                     header.className = 'cipher-header';
